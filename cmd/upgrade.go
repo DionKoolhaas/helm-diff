@@ -246,7 +246,7 @@ func (d *diffCmd) runHelm3() error {
 		releaseManifest, installManifest, err = genManifest(original, target)
 	}
 
-	currentSpecs := manifest.Parse(string(releaseManifest), d.namespace, true)
+	currentSpecs := manifest.Parse(string(releaseManifest), d.namespace, false)
 
 	var newSpecs map[string]*manifest.MappingResult
 	if d.includeTests {
@@ -254,8 +254,6 @@ func (d *diffCmd) runHelm3() error {
 	} else {
 		newSpecs = manifest.Parse(string(installManifest), d.namespace, d.normalizeManifests, helm3TestHook, helm2TestSuccessHook)
 	}
-	fmt.Println(currentSpecs)
-	fmt.Println(newSpecs)
 	seenAnyChanges := diff.Manifests(currentSpecs, newSpecs, &d.Options, os.Stdout)
 	if d.detailedExitCode && seenAnyChanges {
 		return Error{
