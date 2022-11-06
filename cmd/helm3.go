@@ -43,14 +43,18 @@ func compatibleHelm3Version() error {
 
 }
 func getRelease(release, namespace string) ([]byte, error) {
-	exec.Command("git stash")
-	args := []string{"template", ".", release}
+	gitstash := exec.Command("git", "stash")
+	outputWithRichError(gitstash)
+
+	args := []string{"template", release, ".", "--values", "values.yaml"}
 	if namespace != "" {
 		args = append(args, "--namespace", namespace)
 	}
 	cmd := exec.Command(os.Getenv("HELM_BIN"), args...)
-	exec.Command("git pop")
-	return outputWithRichError(cmd)
+	output, error := outputWithRichError(cmd)
+	gitpop := exec.Command("git", "stash", "pop")
+	outputWithRichError(gitpop)
+	return output, error
 }
 
 func getHooks(release, namespace string) ([]byte, error) {
@@ -165,49 +169,26 @@ func (d *diffCmd) template(isUpgrade bool) ([]byte, error) {
 		filter func([]byte) []byte
 	)
 
-	if d.useUpgradeDryRun {
-		if d.dryRun {
-			return nil, fmt.Errorf("`diff upgrade --dry-run` conflicts with HELM_DIFF_USE_UPGRADE_DRY_RUN_AS_TEMPLATE. Either remove --dry-run to enable cluster access, or unset HELM_DIFF_USE_UPGRADE_DRY_RUN_AS_TEMPLATE to make cluster access unnecessary")
-		}
-
-		if d.isAllowUnreleased() {
-			// Otherwise you get the following error when this is a diff for a new install
-			//   Error: UPGRADE FAILED: "$RELEASE_NAME" has no deployed releases
-			flags = append(flags, "--install")
-		}
-
-		flags = append(flags, "--dry-run")
-		subcmd = "upgrade"
-		filter = func(s []byte) []byte {
-			return extractManifestFromHelmUpgradeDryRunOutput(s, d.noHooks)
-		}
-	} else {
-		if !d.disableValidation && !d.dryRun {
-			flags = append(flags, "--validate")
-		}
-
-		if isUpgrade {
-			flags = append(flags, "--is-upgrade")
-		}
-
-		for _, a := range d.extraAPIs {
-			flags = append(flags, "--api-versions", a)
-		}
-
-		if d.kubeVersion != "" {
-			flags = append(flags, "--kube-version", d.kubeVersion)
-		}
-
-		subcmd = "template"
-
-		filter = func(s []byte) []byte {
-			return s
-		}
+	if isUpgrade {
+		flags = append(flags, "--is-upgrade")
 	}
 
+	for _, a := range d.extraAPIs {
+		flags = append(flags, "--api-versions", a)
+	}
+
+	if d.kubeVersion != "" {
+		flags = append(flags, "--kube-version", d.kubeVersion)
+	}
+
+	subcmd = "template"
+
+	filter = func(s []byte) []byte {
+		return s
+	}
 	args := []string{subcmd, d.release, d.chart}
 	args = append(args, flags...)
-
+	fmt.Println(args)
 	cmd := exec.Command(os.Getenv("HELM_BIN"), args...)
 	out, err := outputWithRichError(cmd)
 	return filter(out), err

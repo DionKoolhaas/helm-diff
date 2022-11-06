@@ -220,27 +220,14 @@ func (d *diffCmd) runHelm3() error {
 		releaseManifest, err = getRelease(d.release, d.namespace)
 	}
 
-	var newInstall bool
-	if err != nil && strings.Contains(err.Error(), "release: not found") {
-		if d.isAllowUnreleased() {
-			fmt.Printf("********************\n\n\tRelease was not present in Helm.  Diff will show entire contents as new.\n\n********************\n")
-			newInstall = true
-			err = nil
-		} else {
-			fmt.Printf("********************\n\n\tRelease was not present in Helm.  Include the `--allow-unreleased` to perform diff without exiting in error.\n\n********************\n")
-			return err
-		}
-	}
-	if err != nil {
-		return fmt.Errorf("Failed to get release %s in namespace %s: %s", d.release, d.namespace, err)
-	}
+	var newInstall bool = true
 
 	installManifest, err := d.template(!newInstall)
 	if err != nil {
 		return fmt.Errorf("Failed to render chart: %s", err)
 	}
 
-	if d.threeWayMerge {
+	if false {
 		actionConfig := new(action.Configuration)
 		if err := actionConfig.Init(envSettings.RESTClientGetter(), envSettings.Namespace(), os.Getenv("HELM_DRIVER"), log.Printf); err != nil {
 			log.Fatalf("%+v", err)
@@ -259,29 +246,17 @@ func (d *diffCmd) runHelm3() error {
 		releaseManifest, installManifest, err = genManifest(original, target)
 	}
 
-	currentSpecs := make(map[string]*manifest.MappingResult)
-	if !newInstall && !d.dryRun {
-		if !d.noHooks {
-			hooks, err := getHooks(d.release, d.namespace)
-			if err != nil {
-				return err
-			}
-			releaseManifest = append(releaseManifest, hooks...)
-		}
-		if d.includeTests {
-			currentSpecs = manifest.Parse(string(releaseManifest), d.namespace, d.normalizeManifests)
-		} else {
-			currentSpecs = manifest.Parse(string(releaseManifest), d.namespace, d.normalizeManifests, helm3TestHook, helm2TestSuccessHook)
-		}
-	}
+	currentSpecs := manifest.Parse(string(releaseManifest), d.namespace, true)
+
 	var newSpecs map[string]*manifest.MappingResult
 	if d.includeTests {
 		newSpecs = manifest.Parse(string(installManifest), d.namespace, d.normalizeManifests)
 	} else {
 		newSpecs = manifest.Parse(string(installManifest), d.namespace, d.normalizeManifests, helm3TestHook, helm2TestSuccessHook)
 	}
+	fmt.Println(currentSpecs)
+	fmt.Println(newSpecs)
 	seenAnyChanges := diff.Manifests(currentSpecs, newSpecs, &d.Options, os.Stdout)
-
 	if d.detailedExitCode && seenAnyChanges {
 		return Error{
 			error: errors.New("identified at least one change, exiting with non-zero exit code (detailed-exitcode parameter enabled)"),
