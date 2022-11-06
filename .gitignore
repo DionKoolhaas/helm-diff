@@ -4,3 +4,4 @@ build/
 release/
 .envrc
 .idea
+helm-diff.exe

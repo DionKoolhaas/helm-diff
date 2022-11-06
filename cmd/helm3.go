@@ -43,11 +43,13 @@ func compatibleHelm3Version() error {
 
 }
 func getRelease(release, namespace string) ([]byte, error) {
-	args := []string{"get", "manifest", release}
+	exec.Command("git stash")
+	args := []string{"template", ".", release}
 	if namespace != "" {
 		args = append(args, "--namespace", namespace)
 	}
 	cmd := exec.Command(os.Getenv("HELM_BIN"), args...)
+	exec.Command("git pop")
 	return outputWithRichError(cmd)
 }
 
