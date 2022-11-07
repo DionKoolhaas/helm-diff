@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"text/template"
 
+	"github.com/gookit/color"
+
 	"github.com/aryann/difflib"
 	"github.com/mgutz/ansi"
 )
@@ -101,7 +103,7 @@ func setupDiffReport(r *Report) {
 // print report for default output: diff
 func printDiffReport(r *Report, to io.Writer) {
 	for _, entry := range r.entries {
-		fmt.Fprintf(to, ansi.Color("%s %s", "yellow")+"\n", entry.key, r.format.changestyles[entry.changeType].message)
+		color.Yellow.Println(entry.key + " " + r.format.changestyles[entry.changeType].message)
 		printDiffRecords(entry.suppressedKinds, entry.kind, entry.context, entry.diffs, to)
 	}
 

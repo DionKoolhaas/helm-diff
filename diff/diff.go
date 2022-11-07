@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/aryann/difflib"
+	"github.com/gookit/color"
 	"github.com/mgutz/ansi"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -301,9 +302,10 @@ func printDiffRecord(diff difflib.DiffRecord, to io.Writer) {
 
 	switch diff.Delta {
 	case difflib.RightOnly:
-		fmt.Fprintf(to, "%s\n", ansi.Color("+ "+text, "green"))
+		//fmt.Fprintln(to, "+ "+text)
+		color.Greenln("+ " + text)
 	case difflib.LeftOnly:
-		fmt.Fprintf(to, "%s\n", ansi.Color("- "+text, "red"))
+		color.Redln("- " + text)
 	case difflib.Common:
 		if text == "" {
 			fmt.Fprintln(to)
