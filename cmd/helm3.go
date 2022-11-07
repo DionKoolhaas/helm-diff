@@ -46,6 +46,9 @@ func getRelease(release, namespace string) ([]byte, error) {
 	gitstash := exec.Command("git", "stash")
 	outputWithRichError(gitstash)
 
+	dependencyUpdate := exec.Command(os.Getenv("HELM_BIN"), "dependency", "update")
+	outputWithRichError(dependencyUpdate)
+
 	args := []string{"template", release, ".", "--values", "values.yaml"}
 	if namespace != "" {
 		args = append(args, "--namespace", namespace)
@@ -54,6 +57,10 @@ func getRelease(release, namespace string) ([]byte, error) {
 	output, error := outputWithRichError(cmd)
 	gitpop := exec.Command("git", "stash", "pop")
 	outputWithRichError(gitpop)
+
+	dependencyUpdate = exec.Command(os.Getenv("HELM_BIN"), "dependency", "update")
+	outputWithRichError(dependencyUpdate)
+
 	return output, error
 }
 
