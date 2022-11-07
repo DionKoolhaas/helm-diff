@@ -43,9 +43,17 @@ func compatibleHelm3Version() error {
 
 }
 func getRelease(release, namespace string) ([]byte, error) {
-	gitstash := exec.Command("git", "stash")
-	outputWithRichError(gitstash)
 
+	gitstash := exec.Command("git", "diff", "-R")
+	test, _ := outputWithRichError(gitstash)
+	f, _ := os.Create("go-to-diff.patch")
+	f.WriteString(string(test))
+	gitstash = exec.Command("git", "diff")
+	test, _ = outputWithRichError(gitstash)
+	f, _ = os.Create("restore.patch")
+	f.WriteString(string(test))
+	gitstash = exec.Command("git", "apply", "go-to-diff.patch")
+	outputWithRichError(gitstash)
 	dependencyUpdate := exec.Command(os.Getenv("HELM_BIN"), "dependency", "update")
 	outputWithRichError(dependencyUpdate)
 
@@ -55,12 +63,15 @@ func getRelease(release, namespace string) ([]byte, error) {
 	}
 	cmd := exec.Command(os.Getenv("HELM_BIN"), args...)
 	output, error := outputWithRichError(cmd)
-	gitpop := exec.Command("git", "stash", "pop")
-	outputWithRichError(gitpop)
+
+	gitstash = exec.Command("git", "apply", "restore.patch")
+	outputWithRichError(gitstash)
 
 	dependencyUpdate = exec.Command(os.Getenv("HELM_BIN"), "dependency", "update")
 	outputWithRichError(dependencyUpdate)
 
+	os.Remove("go-to-diff.patch")
+	os.Remove("restore.patch")
 	return output, error
 }
 
