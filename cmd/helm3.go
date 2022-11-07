@@ -43,23 +43,44 @@ func compatibleHelm3Version() error {
 
 }
 func getRelease(release, namespace string) ([]byte, error) {
+	args := []string{"get", "manifest", release}
+	if namespace != "" {
+		args = append(args, "--namespace", namespace)
+	}
+	cmd := exec.Command(os.Getenv("HELM_BIN"), args...)
+	return outputWithRichError(cmd)
+}
 
-	gitstash := exec.Command("git", "diff", "-R")
+func getReleaseFromTemplate(d *diffCmd) ([]byte, error) {
+	gitDiffArgs := []string{}
+	if len(d.args) == 1 {
+		gitDiffArgs = []string{"diff", "-R", d.args[0]}
+	} else {
+		gitDiffArgs = []string{"diff", "-R"}
+	}
+	gitstash := exec.Command("git", gitDiffArgs...)
 	test, _ := outputWithRichError(gitstash)
 	f, _ := os.Create("go-to-diff.patch")
 	f.WriteString(string(test))
-	gitstash = exec.Command("git", "diff")
+	f.Close()
+	if len(d.args) == 1 {
+		gitDiffArgs = []string{"diff", d.args[0]}
+	} else {
+		gitDiffArgs = []string{"diff"}
+	}
+	gitstash = exec.Command("git", gitDiffArgs...)
 	test, _ = outputWithRichError(gitstash)
 	f, _ = os.Create("restore.patch")
 	f.WriteString(string(test))
+	f.Close()
 	gitstash = exec.Command("git", "apply", "go-to-diff.patch")
 	outputWithRichError(gitstash)
 	dependencyUpdate := exec.Command(os.Getenv("HELM_BIN"), "dependency", "update")
 	outputWithRichError(dependencyUpdate)
 
-	args := []string{"template", release, ".", "--values", "values.yaml"}
-	if namespace != "" {
-		args = append(args, "--namespace", namespace)
+	args := []string{"template", "."}
+	for _, value := range d.valueFiles {
+		args = append(args, "--values", value)
 	}
 	cmd := exec.Command(os.Getenv("HELM_BIN"), args...)
 	output, error := outputWithRichError(cmd)
@@ -70,8 +91,14 @@ func getRelease(release, namespace string) ([]byte, error) {
 	dependencyUpdate = exec.Command(os.Getenv("HELM_BIN"), "dependency", "update")
 	outputWithRichError(dependencyUpdate)
 
-	os.Remove("go-to-diff.patch")
-	os.Remove("restore.patch")
+	err := os.Remove("go-to-diff.patch")
+	if err != nil {
+		fmt.Println(err)
+	}
+	err = os.Remove("restore.patch")
+	if err != nil {
+		fmt.Println(err)
+	}
 	return output, error
 }
 
@@ -120,9 +147,9 @@ func (d *diffCmd) template(isUpgrade bool) ([]byte, error) {
 	if d.chartRepo != "" {
 		flags = append(flags, "--repo", d.chartRepo)
 	}
-	if d.namespace != "" {
-		flags = append(flags, "--namespace", d.namespace)
-	}
+	//if d.namespace != "" {
+	//	flags = append(flags, "--namespace", d.namespace)
+	//}
 	if d.postRenderer != "" {
 		flags = append(flags, "--post-renderer", d.postRenderer)
 	}
@@ -139,10 +166,10 @@ func (d *diffCmd) template(isUpgrade bool) ([]byte, error) {
 		if err := d.writeExistingValues(tmpfile); err != nil {
 			return nil, err
 		}
-		flags = append(flags, "--values", tmpfile.Name())
+		//flags = append(flags, "--values", tmpfile.Name())
 	}
 	for _, value := range d.values {
-		flags = append(flags, "--set", value)
+		flags = append(flags, "--values", value)
 	}
 	for _, stringValue := range d.stringValues {
 		flags = append(flags, "--set-string", stringValue)
@@ -169,7 +196,7 @@ func (d *diffCmd) template(isUpgrade bool) ([]byte, error) {
 				return nil, err
 			}
 
-			flags = append(flags, "--values", tmpfile.Name())
+			//flags = append(flags, "--values", tmpfile.Name())
 		} else {
 			flags = append(flags, "--values", valueFile)
 		}
@@ -204,16 +231,15 @@ func (d *diffCmd) template(isUpgrade bool) ([]byte, error) {
 	filter = func(s []byte) []byte {
 		return s
 	}
-	args := []string{subcmd, d.release, d.chart}
+	args := []string{subcmd, "."}
 	args = append(args, flags...)
-	fmt.Println(args)
 	cmd := exec.Command(os.Getenv("HELM_BIN"), args...)
 	out, err := outputWithRichError(cmd)
 	return filter(out), err
 }
 
 func (d *diffCmd) writeExistingValues(f *os.File) error {
-	cmd := exec.Command(os.Getenv("HELM_BIN"), "get", "values", d.release, "--all", "--output", "yaml")
+	cmd := exec.Command(os.Getenv("HELM_BIN"), "get", "values", "my-release", "--all", "--output", "yaml")
 	debugPrint("Executing %s", strings.Join(cmd.Args, " "))
 	defer f.Close()
 	cmd.Stdout = f

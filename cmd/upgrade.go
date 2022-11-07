@@ -31,8 +31,7 @@ import (
 )
 
 type diffCmd struct {
-	release                  string
-	chart                    string
+	args                     []string
 	chartVersion             string
 	chartRepo                string
 	client                   helm.Interface
@@ -114,7 +113,10 @@ func newChartCommand() *cobra.Command {
 			"  HELM_DIFF_NORMALIZE_MANIFESTS=true helm diff upgrade my-release datadog/datadog",
 		}, "\n"),
 		Args: func(cmd *cobra.Command, args []string) error {
-			return checkArgsLength(len(args), "release name", "chart path")
+			if len(args) > 1 {
+				return fmt.Errorf("This command only has one optional argument, which is de commit")
+			}
+			return nil
 		},
 		PreRun: func(*cobra.Command, []string) {
 			expandTLSPaths()
@@ -146,8 +148,7 @@ func newChartCommand() *cobra.Command {
 
 			ProcessDiffOptions(cmd.Flags(), &diff.Options)
 
-			diff.release = args[0]
-			diff.chart = args[1]
+			diff.args = args
 			if isHelm3() {
 				return diff.runHelm3()
 			}
@@ -217,7 +218,7 @@ func (d *diffCmd) runHelm3() error {
 	var err error
 
 	if !d.dryRun {
-		releaseManifest, err = getRelease(d.release, d.namespace)
+		releaseManifest, err = getReleaseFromTemplate(d)
 	}
 
 	var newInstall bool = true
@@ -376,7 +377,7 @@ func (d *diffCmd) run() error {
 		d.chartVersion = ">0.0.0-0"
 	}
 
-	chartPath, err := locateChartPath(d.chart, d.chartVersion, false, "")
+	chartPath, err := locateChartPath(".", d.chartVersion, false, "")
 	if err != nil {
 		return err
 	}
@@ -390,10 +391,10 @@ func (d *diffCmd) run() error {
 		return err
 	}
 
-	releaseResponse, err := d.client.ReleaseContent(d.release)
+	releaseResponse, err := d.client.ReleaseContent("my-release")
 
 	var newInstall bool
-	if err != nil && strings.Contains(err.Error(), fmt.Sprintf("release: %q not found", d.release)) {
+	if err != nil && strings.Contains(err.Error(), fmt.Sprintf("release: %q not found", "my-release")) {
 		if d.isAllowUnreleased() {
 			fmt.Printf("********************\n\n\tRelease was not present in Helm.  Diff will show entire contents as new.\n\n********************\n")
 			newInstall = true
@@ -413,7 +414,7 @@ func (d *diffCmd) run() error {
 		installResponse, err := d.client.InstallRelease(
 			chartPath,
 			d.namespace,
-			helm.ReleaseName(d.release),
+			helm.ReleaseName("my-release"),
 			helm.ValueOverrides(rawVals),
 			helm.InstallDryRun(true),
 		)
@@ -425,7 +426,7 @@ func (d *diffCmd) run() error {
 		newSpecs = manifest.Parse(installResponse.Release.Manifest, installResponse.Release.Namespace, d.normalizeManifests)
 	} else {
 		upgradeResponse, err := d.client.UpdateRelease(
-			d.release,
+			"my-release",
 			chartPath,
 			helm.UpdateValueOverrides(rawVals),
 			helm.ReuseValues(d.reuseValues),
