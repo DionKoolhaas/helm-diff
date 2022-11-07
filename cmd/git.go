@@ -84,11 +84,11 @@ func newChartCommand() *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "upgrade [flags] [RELEASE] [CHART]",
-		Short: "Show a diff explaining what a helm upgrade would change.",
+		Use:   "git [flags] [RELEASE] [CHART]",
+		Short: "Show a diff explaining what a helm git would change.",
 		Long:  globalUsage,
 		Example: strings.Join([]string{
-			"  helm diff upgrade my-release stable/postgresql --values values.yaml",
+			"  helm diff git my-release stable/postgresql --values values.yaml",
 			"",
 			"  # Set HELM_DIFF_IGNORE_UNKNOWN_FLAGS=true to ignore unknown flags",
 			"  # It's useful when you're using `helm-diff` in a `helm upgrade` wrapper.",
