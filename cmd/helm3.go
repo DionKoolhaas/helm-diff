@@ -75,8 +75,7 @@ func getReleaseFromTemplate(d *diffCmd) ([]byte, error) {
 	f.Close()
 	gitstash = exec.Command("git", "apply", "go-to-diff.patch")
 	outputWithRichError(gitstash)
-	dependencyUpdate := exec.Command(os.Getenv("HELM_BIN"), "dependency", "update")
-	outputWithRichError(dependencyUpdate)
+	updateDependencies()
 
 	args := []string{"template", "."}
 	for _, value := range d.valueFiles {
@@ -88,8 +87,7 @@ func getReleaseFromTemplate(d *diffCmd) ([]byte, error) {
 	gitstash = exec.Command("git", "apply", "restore.patch")
 	outputWithRichError(gitstash)
 
-	dependencyUpdate = exec.Command(os.Getenv("HELM_BIN"), "dependency", "update")
-	outputWithRichError(dependencyUpdate)
+	updateDependencies()
 
 	err := os.Remove("go-to-diff.patch")
 	if err != nil {
